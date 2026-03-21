@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>コメント翻訳 | わんコメプラグイン</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --bg2: #1a1d27;
+      --bg3: #22263a;
+      --border: #2d3250;
+      --accent: #5b6ef5;
+      --accent-dim: #3a4499;
+      --text: #e8eaf6;
+      --text-dim: #8891b8;
+      --ok: #4caf82;
+      --warn: #f5a623;
+      --error: #e05c5c;
+      --info: #5b9ef5;
+      --radius: 8px;
+      --font-mono: 'Consolas', 'Menlo', monospace;
+    }
+
+    body {
+      font-family: 'Segoe UI', 'Hiragino Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .header-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--text-dim);
+      transition: background 0.3s;
+    }
+    .status-dot.ok { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+    .status-dot.error { background: var(--error); }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-family: inherit;
+      transition: opacity 0.15s;
+    }
+    button:hover { opacity: 0.8; }
+
+    .btn-icon {
+      background: var(--bg3);
+      color: var(--text-dim);
+      padding: 6px 10px;
+      border: 1px solid var(--border);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      padding: 6px 14px;
+      font-weight: 600;
+    }
+
+    .btn-danger {
+      background: transparent;
+      color: var(--error);
+      padding: 4px 8px;
+      border: 1px solid var(--error);
+      font-size: 11px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 2px;
+      padding: 8px 16px 0;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tab {
+      background: transparent;
+      color: var(--text-dim);
+      padding: 7px 14px;
+      border-radius: var(--radius) var(--radius) 0 0;
+      font-size: 13px;
+      border: 1px solid transparent;
+      border-bottom: none;
+      position: relative;
+    }
+
+    .tab.active {
+      background: var(--bg);
+      color: var(--text);
+      border-color: var(--border);
+      font-weight: 600;
+    }
+
+    .tab-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      font-size: 10px;
+      font-weight: 700;
+      margin-left: 5px;
+      background: var(--error);
+      color: #fff;
+      vertical-align: middle;
+    }
+    .tab-badge:empty { display: none; }
+
+    .panel {
+      display: none;
+      padding: 12px 16px;
+    }
+    .panel.active { display: block; }
+
+    .translation-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .translation-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      animation: fadeIn 0.25s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .card-name {
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--accent);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 160px;
+    }
+
+    .lang-badge {
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 99px;
+      background: var(--bg3);
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .card-time {
+      margin-left: auto;
+      font-size: 11px;
+      color: var(--text-dim);
+      flex-shrink: 0;
+    }
+
+    .card-original {
+      color: var(--text-dim);
+      font-size: 13px;
+      margin-bottom: 4px;
+      word-break: break-word;
+    }
+
+    .card-arrow {
+      color: var(--text-dim);
+      margin-right: 6px;
+    }
+
+    .card-translated {
+      font-size: 14px;
+      color: var(--text);
+      word-break: break-word;
+    }
+
+    .error-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .error-card {
+      background: rgba(224, 92, 92, 0.08);
+      border: 1px solid rgba(224, 92, 92, 0.3);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      animation: fadeIn 0.25s ease;
+    }
+
+    .error-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .error-code {
+      font-size: 11px;
+      font-family: var(--font-mono);
+      background: var(--bg3);
+      padding: 2px 7px;
+      border-radius: 4px;
+      color: var(--error);
+    }
+
+    .error-time {
+      margin-left: auto;
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .error-cause {
+      font-weight: 600;
+      color: var(--error);
+      margin-bottom: 4px;
+    }
+
+    .error-solution {
+      color: var(--text-dim);
+      font-size: 13px;
+    }
+
+    .error-solution a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .error-solution a:hover { text-decoration: underline; }
+
+    .debug-log {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .debug-entry {
+      display: flex;
+      gap: 8px;
+      padding: 3px 8px;
+      border-radius: 4px;
+    }
+    .debug-entry:hover { background: var(--bg2); }
+
+    .debug-time {
+      color: var(--text-dim);
+      flex-shrink: 0;
+      font-size: 11px;
+    }
+
+    .debug-level {
+      flex-shrink: 0;
+      width: 44px;
+      text-align: center;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 0;
+    }
+    .debug-level.INFO  { color: var(--info);  background: rgba(91,158,245,0.12); }
+    .debug-level.DEBUG { color: var(--text-dim); background: var(--bg3); }
+    .debug-level.ERROR { color: var(--error); background: rgba(224,92,92,0.12); }
+    .debug-level.WARN  { color: var(--warn);  background: rgba(245,166,35,0.12); }
+
+    .debug-msg {
+      color: var(--text-dim);
+      word-break: break-all;
+      white-space: pre-wrap;
+    }
+
+    .settings-section {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      max-width: 480px;
+    }
+
+    .settings-title {
+      font-weight: 600;
+      margin-bottom: 14px;
+      color: var(--text-dim);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .form-row {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      margin-bottom: 12px;
+    }
+
+    label {
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+
+    input[type="text"],
+    input[type="password"],
+    select {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 8px 10px;
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      width: 100%;
+      transition: border-color 0.15s;
+    }
+    input:focus, select:focus { border-color: var(--accent); }
+
+    .form-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .save-result {
+      font-size: 12px;
+      padding: 4px 0;
+      height: 20px;
+      color: var(--ok);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--text-dim);
+    }
+    .empty-state .icon { font-size: 32px; margin-bottom: 8px; }
+    .empty-state p { font-size: 13px; }
+
+    .divider-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .section-label {
+      font-size: 12px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .refresh-indicator {
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .guide-container {
+      max-width: 600px;
+    }
+
+    .guide-heading {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .guide-desc {
+      color: var(--text-dim);
+      font-size: 13px;
+      margin-bottom: 20px;
+    }
+
+    .guide-step {
+      display: flex;
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+
+    .step-number {
+      flex-shrink: 0;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 2px;
+    }
+
+    .step-content { flex: 1; }
+
+    .step-title {
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 6px;
+    }
+
+    .step-body {
+      color: var(--text-dim);
+      font-size: 13px;
+      margin-bottom: 6px;
+      line-height: 1.6;
+    }
+
+    .step-sub {
+      color: var(--text-dim);
+      font-size: 12px;
+      margin: 6px 0 4px;
+    }
+
+    .code-block {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      color: var(--ok);
+      margin: 6px 0;
+      user-select: all;
+    }
+
+    .model-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      margin-top: 10px;
+    }
+
+    .model-table th {
+      text-align: left;
+      color: var(--text-dim);
+      font-weight: 600;
+      border-bottom: 1px solid var(--border);
+      padding: 4px 8px;
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 0.05em;
+    }
+
+    .model-table td {
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+      vertical-align: top;
+    }
+
+    .model-table tr:last-child td { border-bottom: none; }
+
+    .model-name {
+      font-family: var(--font-mono);
+      color: var(--ok);
+    }
+
+    .test-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .test-result {
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-title">
+    <div class="status-dot" id="statusDot"></div>
+    🌐 コメント翻訳
+  </div>
+  <div class="header-actions">
+    <span class="refresh-indicator" id="refreshLabel">--</span>
+    <button class="btn-icon" onclick="openSettings()">⚙ 設定</button>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab active" id="tab-translations" onclick="switchTab('translations')">翻訳</button>
+  <button class="tab" id="tab-errors" onclick="switchTab('errors')">
+    エラー<span class="tab-badge" id="errorBadge"></span>
+  </button>
+  <button class="tab" id="tab-debug" onclick="switchTab('debug')">デバッグ</button>
+  <button class="tab" id="tab-settings" onclick="switchTab('settings')">設定</button>
+  <button class="tab" id="tab-ollama-guide" onclick="switchTab('ollama-guide')">Ollamaガイド</button>
+</div>
+
+<div class="panel active" id="panel-translations">
+  <div class="divider-row">
+    <span class="section-label">翻訳履歴（最新50件）</span>
+    <button class="btn-danger" onclick="clearData('translations')">クリア</button>
+  </div>
+  <div class="translation-list" id="translationList">
+    <div class="empty-state">
+      <div class="icon">🌐</div>
+      <p>日本語以外のコメントが来ると翻訳が表示されます</p>
+    </div>
+  </div>
+</div>
+
+<div class="panel" id="panel-errors">
+  <div class="divider-row">
+    <span class="section-label">エラーログ</span>
+    <button class="btn-danger" onclick="clearData('errors')">クリア</button>
+  </div>
+  <div class="error-list" id="errorList">
+    <div class="empty-state">
+      <div class="icon">✅</div>
+      <p>エラーはありません</p>
+    </div>
+  </div>
+</div>
+
+<div class="panel" id="panel-debug">
+  <div class="divider-row">
+    <span class="section-label">デバッグログ（最新100件）</span>
+    <button class="btn-danger" onclick="clearData('debug')">クリア</button>
+  </div>
+  <div class="debug-log" id="debugLog">
+    <div class="empty-state">
+      <div class="icon">📋</div>
+      <p>ログはまだありません</p>
+    </div>
+  </div>
+</div>
+
+<div class="panel" id="panel-settings">
+  <div class="settings-section">
+    <div class="settings-title">翻訳エンジン設定</div>
+
+    <div class="form-row">
+      <label for="apiKey">DeepL APIキー（Free）</label>
+      <input
+        type="password"
+        id="apiKey"
+        placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx:fx"
+        autocomplete="off"
+      />
+      <span style="font-size:11px; color:var(--text-dim)">
+        APIキーは <a href="https://www.deepl.com/account/summary" target="_blank" style="color:var(--accent)">DeepLダッシュボード</a> で取得してください。
+        ※ コメントテキストがDeepLサーバーに送信されます（無料版はDeepLのサービス改善に使用される場合があります）
+      </span>
+    </div>
+
+    <div class="form-row">
+      <label for="engineSelect">翻訳エンジン</label>
+      <select id="engineSelect" onchange="onEngineChange(this.value)">
+        <option value="deepl">DeepL（推奨）</option>
+        <option value="ollama">ローカル / Ollama（α版）</option>
+      </select>
+    </div>
+
+    <div class="form-row" id="ollamaModelRow" style="display:none">
+      <label for="ollamaModel">Ollamaモデル名</label>
+      <input type="text" id="ollamaModel" placeholder="translategemma:4b" autocomplete="off" />
+      <span style="font-size:11px; color:var(--text-dim)">
+        モデルの識別子を入力してください（例: translategemma:4b, qwen3.5:9b）。
+        詳細は「Ollamaガイド」タブを参照してください。
+      </span>
+    </div>
+
+    <div class="form-row">
+      <label for="targetLang">翻訳先言語</label>
+      <select id="targetLang">
+        <option value="JA">日本語</option>
+        <option value="EN-US">English (US)</option>
+      </select>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn-primary" onclick="saveSettings()">保存</button>
+    </div>
+    <div class="save-result" id="saveResult"></div>
+  </div>
+</div>
+
+<div class="panel" id="panel-ollama-guide">
+  <div class="guide-container">
+    <div class="guide-heading">Ollamaセットアップガイド</div>
+    <div class="guide-desc">
+      ローカルAIモデルを使ってコメントをリアルタイム翻訳する機能です。APIキー不要・インターネット接続なしで動作します。<br>
+      GPUメモリ（VRAM）にモデルを読み込んで動作するため、<strong>NVIDIA製GPU推奨</strong>（目安: VRAM 6GB以上）。
+    </div>
+
+    <div class="guide-step">
+      <div class="step-number">1</div>
+      <div class="step-content">
+        <div class="step-title">Ollamaをインストールする</div>
+        <div class="step-body">
+          公式サイト <strong>ollama.com</strong> からお使いのOS（Windows / Mac / Linux）用インストーラーをダウンロードしてインストールしてください。
+        </div>
+      </div>
+    </div>
+
+    <div class="guide-step">
+      <div class="step-number">2</div>
+      <div class="step-content">
+        <div class="step-title">Ollamaを起動する</div>
+        <div class="step-sub">◆ Windowsの場合</div>
+        <div class="step-body">スタートメニューから「Ollama」を起動するとシステムトレイに常駐します。PC起動時に自動起動するよう設定することもできます。</div>
+        <div class="step-sub">◆ コマンドラインの場合（Windows / Mac / Linux共通）</div>
+        <div class="code-block">ollama serve</div>
+        <div class="step-body">このコマンドは実行したままにしてください。終了するとOllamaも停止します。</div>
+      </div>
+    </div>
+
+    <div class="guide-step">
+      <div class="step-number">3</div>
+      <div class="step-content">
+        <div class="step-title">翻訳モデルをダウンロードする</div>
+        <div class="step-body">
+          別のターミナルを開き、以下のコマンドを実行します。ダウンロードは1回だけ必要です（数GB）。
+        </div>
+        <div class="step-sub">◆ まず試すならこれ（最推奨）</div>
+        <div class="code-block">ollama pull translategemma:4b</div>
+        <div class="step-body">
+          Google翻訳チームが開発した翻訳特化モデル。わずか3.3GBで55言語に対応し、同サイズの汎用モデルより大幅に高い翻訳品質を実現します。英語・中国語・韓国語・スペイン語→日本語の翻訳に特に強く、リアルタイム配信での応答速度も抜群です。
+        </div>
+
+        <div class="step-sub">◆ 用途別おすすめモデル（2026年3月調査）</div>
+        <table class="model-table">
+          <thead>
+            <tr>
+              <th>識別子</th>
+              <th>サイズ</th>
+              <th>対応言語</th>
+              <th>ライセンス</th>
+              <th>特徴</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="model-name">translategemma:4b</td>
+              <td>3.3 GB</td>
+              <td>55言語</td>
+              <td>Gemma ToU</td>
+              <td>★ 一般に推奨。翻訳特化・高速。VRAMに余裕が生まれ安定動作</td>
+            </tr>
+            <tr>
+              <td class="model-name">qwen3.5:9b</td>
+              <td>6.6 GB</td>
+              <td>201言語</td>
+              <td>Apache 2.0</td>
+              <td>★ VRAMに余裕のある方に推奨。汎用性重視。最多クラスの言語数で自然な翻訳</td>
+            </tr>
+            <tr>
+              <td class="model-name">translategemma:12b</td>
+              <td>8.1 GB</td>
+              <td>55言語</td>
+              <td>Gemma ToU</td>
+              <td>かなり容量の大きいモデルなので基本的には非推奨。27Bクラスの汎用モデルを超える翻訳精度</td>
+            </tr>
+            <tr>
+              <td class="model-name">qwen3:8b</td>
+              <td>5.2 GB</td>
+              <td>119言語</td>
+              <td>Apache 2.0</td>
+              <td>日本語の実績が豊富。品質と速度のバランスが良い</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="step-sub">◆ VRAM最適化（VRAMが少ない場合）</div>
+        <div class="step-body">以下の環境変数を設定するとVRAM使用量を削減できます（品質への影響は軽微）。</div>
+        <div class="code-block">OLLAMA_FLASH_ATTENTION=1
+OLLAMA_KV_CACHE_TYPE=q8_0</div>
+      </div>
+    </div>
+
+    <div class="guide-step">
+      <div class="step-number">4</div>
+      <div class="step-content">
+        <div class="step-title">設定タブでモデルを選択する</div>
+        <div class="step-body">
+          「設定」タブを開き、翻訳エンジンを <strong>ローカル / Ollama</strong> に変更してください。<br>
+          モデル名の欄にダウンロードしたモデルの識別子（例: <code style="font-family:var(--font-mono);color:var(--ok)">translategemma:4b</code>）を入力して保存します。
+        </div>
+      </div>
+    </div>
+
+    <div class="guide-step">
+      <div class="step-number">5</div>
+      <div class="step-content">
+        <div class="step-title">接続テスト</div>
+        <div class="step-body">Ollamaが正常に起動しているか確認します。起動中なら利用可能なモデル一覧も表示されます。</div>
+        <div class="test-row">
+          <button class="btn-primary" onclick="testOllamaConnection(event)">接続テスト</button>
+          <span class="test-result" id="ollamaTestResult">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:24px; padding:14px 16px; background:rgba(245,166,35,0.07); border:1px solid rgba(245,166,35,0.3); border-radius:var(--radius); font-size:12px; color:var(--text-dim); line-height:1.7;">
+      <div style="font-weight:700; color:var(--warn); margin-bottom:6px;">⚠ ライセンスと利用規約に関する注意事項</div>
+      <ul style="padding-left:16px; margin:0;">
+        <li>使用するモデルのライセンス遵守はユーザーの責任です。商用配信（収益化配信等）では特に確認してください。</li>
+        <li>Gemma Terms of Use（TranslateGemma / Gemma 3）は商用利用に条件があります。詳細は各モデルの公式ページを確認してください。</li>
+        <li>本プラグインの使用にあたっては、わんコメおよび各配信プラットフォームの利用規約に従ってください。</li>
+        <li>詳細は <a href="https://github.com/qua121/onecomme-comment-translator#免責事項" target="_blank" style="color:var(--accent)">README の免責事項</a> を参照してください。</li>
+      </ul>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  const PLUGIN_UID = 'com.qua121.comment-translator'
+  const API_BASE   = `http://localhost:11180/api/plugins/${PLUGIN_UID}`
+  const POLL_MS    = 3000
+
+  const LANG_LABEL = {
+    JA: '🇯🇵 JA', KO: '🇰🇷 KO', ZH: '🇨🇳 ZH',
+    EN: '🇺🇸 EN', ES: '🇪🇸 ES', OTHER: '🌐',
+  }
+
+  let currentTab = 'translations'
+  let lastVersion = -1
+
+  function switchTab(name) {
+    currentTab = name
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'))
+    document.getElementById(`tab-${name}`).classList.add('active')
+    document.getElementById(`panel-${name}`).classList.add('active')
+    if (name === 'settings') loadSettings()
+  }
+
+  function openSettings() { switchTab('settings') }
+
+  function fmtTime(iso) {
+    if (!iso) return ''
+    const d = new Date(iso)
+    return d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  }
+
+  function renderTranslations(list) {
+    const el = document.getElementById('translationList')
+    if (!list || list.length === 0) {
+      el.innerHTML = `
+        <div class="empty-state">
+          <div class="icon">🌐</div>
+          <p>日本語以外のコメントが来ると翻訳が表示されます</p>
+        </div>`
+      return
+    }
+    el.innerHTML = list.map(item => `
+      <div class="translation-card">
+        <div class="card-header">
+          <span class="card-name" title="${escHtml(item.name)}">${escHtml(item.name)}</span>
+          <span class="lang-badge">${LANG_LABEL[item.lang] || item.lang}</span>
+          <span class="card-time">${fmtTime(item.timestamp)}</span>
+        </div>
+        <div class="card-original">${escHtml(item.original)}</div>
+        <div class="card-translated">
+          <span class="card-arrow">→</span>${escHtml(item.translated)}
+        </div>
+      </div>`
+    ).join('')
+  }
+
+  function renderErrors(list) {
+    const el = document.getElementById('errorList')
+
+    const badge = document.getElementById('errorBadge')
+    badge.textContent = list && list.length > 0 ? list.length : ''
+
+    const dot = document.getElementById('statusDot')
+    dot.className = 'status-dot ' + (list && list.length > 0 ? 'error' : 'ok')
+
+    if (!list || list.length === 0) {
+      el.innerHTML = `
+        <div class="empty-state">
+          <div class="icon">✅</div>
+          <p>エラーはありません</p>
+        </div>`
+      return
+    }
+
+    el.innerHTML = list.map(item => `
+      <div class="error-card">
+        <div class="error-header">
+          <span class="error-code">${escHtml(String(item.code))}</span>
+          <span class="error-time">${fmtTime(item.timestamp)}</span>
+        </div>
+        <div class="error-cause">${escHtml(item.cause || item.message)}</div>
+        <div class="error-solution">
+          ${escHtml(item.solution || '')}
+          ${item.link ? ` <a href="${escHtml(item.link)}" target="_blank">→ 詳細</a>` : ''}
+        </div>
+      </div>`
+    ).join('')
+  }
+
+  function renderDebug(list) {
+    const el = document.getElementById('debugLog')
+    if (!list || list.length === 0) {
+      el.innerHTML = `
+        <div class="empty-state">
+          <div class="icon">📋</div>
+          <p>ログはまだありません</p>
+        </div>`
+      return
+    }
+    el.innerHTML = list.map(item => `
+      <div class="debug-entry">
+        <span class="debug-time">${fmtTime(item.timestamp)}</span>
+        <span class="debug-level ${item.level}">${escHtml(item.level)}</span>
+        <span class="debug-msg">${escHtml(item.message)}</span>
+      </div>`
+    ).join('')
+  }
+
+  async function testOllamaConnection(event) {
+    const btn = event.currentTarget
+    const result = document.getElementById('ollamaTestResult')
+    btn.disabled = true
+    result.textContent = '確認中...'
+    result.style.color = 'var(--text-dim)'
+
+    try {
+      const res = await fetch('http://localhost:11434/api/tags', {
+        signal: AbortSignal.timeout(5000),
+      })
+      if (res.ok) {
+        const json = await res.json()
+        const models = json.models?.map(m => m.name).join(', ') || 'なし'
+        result.textContent = `✅ 起動中 | 利用可能なモデル: ${models}`
+        result.style.color = 'var(--ok)'
+      } else {
+        result.textContent = `⚠ 応答エラー (HTTP ${res.status})`
+        result.style.color = 'var(--warn)'
+      }
+    } catch (e) {
+      result.textContent = '❌ 未起動 または接続できません — Step 2 を確認してください'
+      result.style.color = 'var(--error)'
+    } finally {
+      btn.disabled = false
+    }
+  }
+
+  async function loadSettings() {
+    try {
+      const res = await fetch(`${API_BASE}?type=settings`)
+      const json = await res.json()
+      const s = json.response || json
+      document.getElementById('apiKey').value       = s.apiKeySet ? '（設定済み）' : ''
+      document.getElementById('engineSelect').value  = s.engine || 'deepl'
+      document.getElementById('targetLang').value    = s.targetLang || 'JA'
+      document.getElementById('ollamaModel').value   = s.ollamaModel || 'translategemma:4b'
+      onEngineChange(s.engine || 'deepl')
+    } catch (e) {
+      console.warn('loadSettings error:', e)
+    }
+  }
+
+  function onEngineChange(engine) {
+    document.getElementById('ollamaModelRow').style.display =
+      engine === 'ollama' ? '' : 'none'
+    document.getElementById('apiKey').closest('.form-row').style.display =
+      engine === 'ollama' ? 'none' : ''
+  }
+
+  async function saveSettings() {
+    const apiKeyEl = document.getElementById('apiKey')
+    const apiKeyVal = apiKeyEl.value.trim()
+
+    const body = {
+      engine:      document.getElementById('engineSelect').value,
+      targetLang:  document.getElementById('targetLang').value,
+      ollamaModel: document.getElementById('ollamaModel').value.trim() || 'translategemma:4b',
+    }
+
+    if (apiKeyVal && apiKeyVal !== '（設定済み）') {
+      body.apiKey = apiKeyVal
+    }
+
+    try {
+      const res = await fetch(API_BASE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const json = await res.json()
+      const result = document.getElementById('saveResult')
+      if (json.response?.ok || json.ok) {
+        result.textContent = '✅ 保存しました'
+        result.style.color = 'var(--ok)'
+        if (body.apiKey) {
+          apiKeyEl.value = '（設定済み）'
+        }
+      } else {
+        result.textContent = '❌ 保存に失敗しました'
+        result.style.color = 'var(--error)'
+      }
+      setTimeout(() => { result.textContent = '' }, 3000)
+    } catch (e) {
+      document.getElementById('saveResult').textContent = '❌ 通信エラー: ' + e.message
+    }
+  }
+
+  const CLEAR_LABEL = { translations: '翻訳履歴', errors: 'エラーログ', debug: 'デバッグログ' }
+
+  async function clearData(target) {
+    if (!confirm(`${CLEAR_LABEL[target] ?? target} をクリアしますか？`)) return
+    try {
+      await fetch(`${API_BASE}?target=${target}`, { method: 'DELETE' })
+      await poll()
+    } catch (e) {
+      console.warn('clearData error:', e)
+    }
+  }
+
+  let isPolling = false
+
+  async function poll() {
+    if (isPolling) return
+    isPolling = true
+
+    const label = document.getElementById('refreshLabel')
+
+    try {
+      const res = await fetch(`${API_BASE}?version=${lastVersion}`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+
+      const json = await res.json()
+      const data = json.response || json
+
+      if (data.changed === false) {
+        lastVersion = data.version
+        label.textContent = `最終更新: ${new Date().toLocaleTimeString('ja-JP')}`
+        return
+      }
+
+      lastVersion = data.version ?? lastVersion
+      renderTranslations(data.translations || [])
+      renderErrors(data.errors || [])
+      renderDebug(data.debugLog || [])
+
+      label.textContent = `最終更新: ${new Date().toLocaleTimeString('ja-JP')}`
+
+    } catch (e) {
+      label.textContent = `⚠ 接続エラー`
+      document.getElementById('statusDot').className = 'status-dot error'
+      console.warn('poll error:', e)
+    } finally {
+      isPolling = false
+    }
+  }
+
+  function escHtml(str) {
+    return String(str ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;')
+  }
+
+  loadSettings()
+  poll()
+  setInterval(poll, POLL_MS)
+</script>
+</body>
+</html>

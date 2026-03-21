@@ -1,0 +1,16 @@
+{
+  "name": "com.qua121.comment-translator",
+  "version": "0.1.0",
+  "description": "わんコメ用コメント翻訳プラグイン（DeepL / Ollama対応）",
+  "private": true,
+  "main": "plugin.js",
+  "author": "qua121",
+  "license": "MIT",
+  "keywords": [
+    "onecomme",
+    "plugin",
+    "translation",
+    "deepl",
+    "ollama"
+  ]
+}
