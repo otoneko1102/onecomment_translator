@@ -348,7 +348,7 @@ function categorizeError(code) {
 const plugin = {
   name: 'コメント翻訳',
   uid: PLUGIN_UID,
-  version: '0.2.3',
+  version: '0.3.0',
   author: 'qua121',
   url: `http://localhost:11180/plugins/${PLUGIN_UID}/index.html`,
   permissions: ['filter.comment'],

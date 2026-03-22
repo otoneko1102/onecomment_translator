@@ -1,6 +1,6 @@
 {
   "name": "com.qua121.comment-translator",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "description": "わんコメ用コメント翻訳プラグイン（DeepL / Ollama対応）",
   "private": true,
   "main": "plugin.js",
