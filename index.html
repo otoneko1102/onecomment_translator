@@ -840,11 +840,12 @@ OLLAMA_KV_CACHE_TYPE=q8_0</div>
   function renderErrors(list) {
     const el = document.getElementById('errorList')
 
+    const realErrors = list ? list.filter(e => e.code !== 'RESOLVED') : []
     const badge = document.getElementById('errorBadge')
-    badge.textContent = list && list.length > 0 ? list.length : ''
+    badge.textContent = realErrors.length > 0 ? realErrors.length : ''
 
     const dot = document.getElementById('statusDot')
-    dot.className = 'status-dot ' + (list && list.length > 0 ? 'error' : 'ok')
+    dot.className = 'status-dot ' + (realErrors.length > 0 ? 'error' : 'ok')
 
     if (!list || list.length === 0) {
       el.innerHTML = `
@@ -855,10 +856,12 @@ OLLAMA_KV_CACHE_TYPE=q8_0</div>
       return
     }
 
-    el.innerHTML = list.map(item => `
-      <div class="error-card">
+    el.innerHTML = list.map(item => {
+      const isResolved = item.code === 'RESOLVED'
+      return `
+      <div class="error-card" style="${isResolved ? 'border-color:var(--ok); background:rgba(76,175,80,0.07)' : ''}">
         <div class="error-header">
-          <span class="error-code">${escHtml(String(item.code))}</span>
+          <span class="error-code" style="${isResolved ? 'background:var(--ok)' : ''}">${isResolved ? '✅ 解決済み' : escHtml(String(item.code))}</span>
           <span class="error-time">${fmtTime(item.timestamp)}</span>
         </div>
         <div class="error-cause">${escHtml(item.cause || item.message)}</div>
@@ -867,7 +870,7 @@ OLLAMA_KV_CACHE_TYPE=q8_0</div>
           ${item.link ? ` <a href="${escHtml(item.link)}" target="_blank">→ 詳細</a>` : ''}
         </div>
       </div>`
-    ).join('')
+    }).join('')
   }
 
   function renderDebug(list) {

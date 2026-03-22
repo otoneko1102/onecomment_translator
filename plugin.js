@@ -372,7 +372,7 @@ const plugin = {
     this._log('INFO', `engine: ${store.get('engine')} / targetLang: ${store.get('targetLang')}`)
 
     if (store.get('engine') !== 'ollama' && !store.get('apiKey')) {
-      this._pushError('API_KEY_EMPTY', 'APIキーが未設定です。設定ページから入力してください。')
+      this._log('INFO', 'DeepL APIキーが未設定です。設定ページから入力してください。')
     }
   },
 
@@ -438,7 +438,7 @@ const plugin = {
     if (engine === 'deepl') {
       const apiKey = store.get('apiKey')
       if (!apiKey) {
-        this._pushError('API_KEY_EMPTY', `翻訳スキップ: APIキー未設定 (text="${text.slice(0, 20)}")`)
+        this._log('DEBUG', `翻訳スキップ: APIキー未設定 (text="${text.slice(0, 20)}")`)
         return
       }
     }
@@ -649,8 +649,21 @@ const plugin = {
         this._log('INFO', `settings updated: ${JSON.stringify(logBody)}`)
 
         if (body.apiKey) {
-          const errors = (store.get('errors') || []).filter((e) => e.code !== 'API_KEY_EMPTY')
-          store.set('errors', errors)
+          const errors = store.get('errors') || []
+          const hadApiKeyError = errors.some((e) => e.code === 'API_KEY_EMPTY')
+          const filtered = errors.filter((e) => e.code !== 'API_KEY_EMPTY')
+          if (hadApiKeyError) {
+            filtered.unshift({
+              code: 'RESOLVED',
+              message: 'APIキーが設定されました',
+              cause: '解決済み',
+              solution: 'APIキーのエラーは解消されました',
+              link: null,
+              timestamp: new Date().toISOString(),
+            })
+          }
+          store.set('errors', filtered)
+          this._stateVersion++
         }
 
         return { code: 200, response: { ok: true } }
