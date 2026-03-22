@@ -1,0 +1,29 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create release zip
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          ZIP_NAME="comment-translator-${VERSION}.zip"
+          mkdir -p comment-translator
+          cp plugin.js index.html README.md LICENSE comment-translator/
+          zip -r "${ZIP_NAME}" comment-translator/
+          echo "ZIP_NAME=${ZIP_NAME}" >> "$GITHUB_ENV"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ZIP_NAME }}
+          generate_release_notes: true

@@ -5,7 +5,8 @@ const http  = require('http')
 
 const PLUGIN_UID = 'com.qua121.comment-translator'
 const DEEPL_FREE_API_HOST = 'api-free.deepl.com'
-const DEEPL_FREE_API_PATH = '/v2/translate'
+const DEEPL_PRO_API_HOST  = 'api.deepl.com'
+const DEEPL_API_PATH      = '/v2/translate'
 const OLLAMA_HOST = 'localhost'
 const OLLAMA_PORT = 11434
 const OLLAMA_PATH = '/api/chat'
@@ -56,8 +57,12 @@ function shouldSkip(text) {
     .replace(/https?:\/\/\S+/g, '')
     .replace(/[\u{1F000}-\u{1FFFF}]/gu, '')
     .replace(/[\u2600-\u27BF]/g, '')
+    .replace(/@\S+/g, '')
+    .replace(/#\S+/g, '')
     .trim()
-  return stripped.length === 0
+  if (stripped.length <= 1) return true
+  if (/^[0-9\s\p{P}\p{S}]+$/u.test(stripped)) return true
+  return false
 }
 
 class AsyncQueue {
@@ -72,6 +77,13 @@ class AsyncQueue {
       this.queue.push({ task, resolve, reject })
       this._run()
     })
+  }
+
+  clear() {
+    const pending = this.queue.splice(0)
+    for (const { reject } of pending) {
+      reject({ code: 'CANCELLED', message: 'Queue cleared' })
+    }
   }
 
   _run() {
@@ -89,13 +101,48 @@ class AsyncQueue {
   }
 }
 
+const CACHE_MAX_SIZE = 100
+
+class LRUCache {
+  constructor(maxSize) {
+    this.maxSize = maxSize
+    this.cache = new Map()
+  }
+
+  get(key) {
+    if (!this.cache.has(key)) return undefined
+    const value = this.cache.get(key)
+    this.cache.delete(key)
+    this.cache.set(key, value)
+    return value
+  }
+
+  set(key, value) {
+    if (this.cache.has(key)) this.cache.delete(key)
+    this.cache.set(key, value)
+    if (this.cache.size > this.maxSize) {
+      const oldest = this.cache.keys().next().value
+      this.cache.delete(oldest)
+    }
+  }
+
+  clear() {
+    this.cache.clear()
+  }
+}
+
+function isDeepLFreeKey(apiKey) {
+  return apiKey.endsWith(':fx')
+}
+
 function callDeepLAPI(text, apiKey, targetLang = 'JA') {
   return new Promise((resolve, reject) => {
     const body = new URLSearchParams({ text, target_lang: targetLang }).toString()
+    const hostname = isDeepLFreeKey(apiKey) ? DEEPL_FREE_API_HOST : DEEPL_PRO_API_HOST
 
     const options = {
-      hostname: DEEPL_FREE_API_HOST,
-      path: DEEPL_FREE_API_PATH,
+      hostname,
+      path: DEEPL_API_PATH,
       method: 'POST',
       headers: {
         'Authorization': `DeepL-Auth-Key ${apiKey}`,
@@ -146,10 +193,10 @@ function callOllamaAPI(text, model, targetLang, sourceLang = 'OTHER') {
   const targetName = LANG_NAME_FOR_PROMPT[targetLang] || targetLang
   const targetCode = targetLang.split('-')[0] // 'EN-US' → 'EN'
 
-  const isTranslateGemma = model.toLowerCase().startsWith('translategemma')
+  const isTranslateGemma = model.toLowerCase().startsWith('translategemma') && sourceLang !== 'OTHER'
   let systemPrompt
   if (isTranslateGemma) {
-    const src = SOURCE_LANG_FOR_PROMPT[sourceLang] || SOURCE_LANG_FOR_PROMPT['OTHER']
+    const src = SOURCE_LANG_FOR_PROMPT[sourceLang]
     systemPrompt =
       `You are a professional ${src.name} (${src.code}) to ${targetName} (${targetCode}) translator.`
   } else {
@@ -219,8 +266,8 @@ const ERROR_CATALOG = {
     link: 'https://www.deepl.com/account/summary',
   },
   403: {
-    cause: 'APIキーが無効です',
-    solution: 'DeepLダッシュボードでAPIキーを確認してください',
+    cause: 'APIキーが無効、またはキー種別とエンドポイントが一致しません',
+    solution: 'Freeキーは末尾が :fx です。ProキーをFree APIで使用していないか確認してください',
     link: 'https://www.deepl.com/account/summary',
   },
   456: {
@@ -298,12 +345,16 @@ const plugin = {
 
   _store: null,
   _queue: null,
+  _translationCache: null,
+  _destroyed: false,
   _commentStructureLogged: false,
   _stateVersion: 0,
 
   init({ dir, store }, initialData) {
     this._store = store
     this._queue = new AsyncQueue(QUEUE_CONCURRENCY)
+    this._translationCache = new LRUCache(CACHE_MAX_SIZE)
+    this._destroyed = false
     this._log('INFO', `plugin initialized (v${this.version})`)
     this._log('INFO', `plugin dir: ${dir}`)
     this._log('INFO', `engine: ${store.get('engine')} / targetLang: ${store.get('targetLang')}`)
@@ -315,6 +366,8 @@ const plugin = {
 
   destroy() {
     this._log('INFO', 'plugin destroyed')
+    this._destroyed = true
+    if (this._queue) this._queue.clear()
     this._store = null
   },
 
@@ -345,12 +398,13 @@ const plugin = {
       return comment
     }
 
-    if (isJapanese(text)) {
-      this._log('DEBUG', `skip (JA): "${text.slice(0, 40)}"`)
+    const targetLang = (this._store?.get('targetLang') || 'JA').split('-')[0]
+    const lang = detectLang(text)
+
+    if (lang === targetLang || (lang === 'JA' && targetLang === 'JA')) {
+      this._log('DEBUG', `skip (${lang}=target): "${text.slice(0, 40)}"`)
       return comment
     }
-
-    const lang = detectLang(text)
     this._log('INFO', `queued (${lang}): "${text.slice(0, 40)}"`)
 
     this._translateAsync({ id, name, lang, text }).catch((e) => {
@@ -361,6 +415,7 @@ const plugin = {
   },
 
   async _translateAsync({ id, name, lang, text }) {
+    if (this._destroyed) return
     const store = this._store
     if (!store) return
 
@@ -373,6 +428,21 @@ const plugin = {
         this._pushError('API_KEY_EMPTY', `翻訳スキップ: APIキー未設定 (text="${text.slice(0, 20)}")`)
         return
       }
+    }
+
+    const cached = this._translationCache?.get(text)
+    if (cached) {
+      this._log('INFO', `cache hit: "${text.slice(0, 20)}"`)
+      const entry = {
+        id, name, lang, original: text, translated: cached,
+        timestamp: new Date().toISOString(), status: 'ok',
+      }
+      const list = store.get('translations') || []
+      list.unshift(entry)
+      if (list.length > MAX_TRANSLATIONS) list.length = MAX_TRANSLATIONS
+      store.set('translations', list)
+      this._stateVersion++
+      return
     }
 
     try {
@@ -391,6 +461,7 @@ const plugin = {
       }
 
       this._log('INFO', `ok: "${text.slice(0, 20)}" → "${translated.slice(0, 20)}"`)
+      if (this._translationCache) this._translationCache.set(text, translated)
 
       const entry = {
         id,
@@ -464,6 +535,36 @@ const plugin = {
         if (type === 'debug') {
           return { code: 200, response: { debugLog: store.get('debugLog') || [] } }
         }
+        if (type === 'ollama_test') {
+          return new Promise((resolve) => {
+            const req = http.get(
+              { hostname: OLLAMA_HOST, port: OLLAMA_PORT, path: '/api/tags', timeout: 5000 },
+              (res) => {
+                let data = ''
+                res.on('data', (chunk) => { data += chunk })
+                res.on('end', () => {
+                  if (res.statusCode === 200) {
+                    try {
+                      const json = JSON.parse(data)
+                      resolve({ code: 200, response: { ok: true, models: json.models || [] } })
+                    } catch (e) {
+                      resolve({ code: 200, response: { ok: false, error: 'レスポンス解析エラー' } })
+                    }
+                  } else {
+                    resolve({ code: 200, response: { ok: false, error: `HTTP ${res.statusCode}` } })
+                  }
+                })
+              }
+            )
+            req.on('error', (e) => {
+              resolve({ code: 200, response: { ok: false, error: `接続失敗: ${e.message}` } })
+            })
+            req.on('timeout', () => {
+              req.destroy()
+              resolve({ code: 200, response: { ok: false, error: 'タイムアウト' } })
+            })
+          })
+        }
         if (type === 'settings') {
           return {
             code: 200,
@@ -501,9 +602,16 @@ const plugin = {
         }
         if (body.engine !== undefined && (body.engine === 'deepl' || body.engine === 'ollama')) {
           store.set('engine', body.engine)
+          if (this._translationCache) this._translationCache.clear()
         }
-        if (body.targetLang !== undefined) store.set('targetLang', body.targetLang)
-        if (body.ollamaModel !== undefined) store.set('ollamaModel', body.ollamaModel)
+        if (body.targetLang !== undefined) {
+          store.set('targetLang', body.targetLang)
+          if (this._translationCache) this._translationCache.clear()
+        }
+        if (body.ollamaModel !== undefined) {
+          store.set('ollamaModel', body.ollamaModel)
+          if (this._translationCache) this._translationCache.clear()
+        }
 
         const logBody = { ...body, apiKey: body.apiKey !== undefined ? '***' : undefined }
         this._log('INFO', `settings updated: ${JSON.stringify(logBody)}`)

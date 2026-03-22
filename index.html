@@ -543,11 +543,14 @@
     <span class="section-label">翻訳履歴（最新50件）</span>
     <button class="btn-danger" onclick="clearData('translations')">クリア</button>
   </div>
-  <div class="translation-list" id="translationList">
-    <div class="empty-state">
-      <div class="icon">🌐</div>
-      <p>日本語以外のコメントが来ると翻訳が表示されます</p>
+  <div class="translation-list-wrapper" style="position:relative;">
+    <div class="translation-list" id="translationList" style="max-height:60vh; overflow-y:auto;">
+      <div class="empty-state">
+        <div class="icon">🌐</div>
+        <p>日本語以外のコメントが来ると翻訳が表示されます</p>
+      </div>
     </div>
+    <button id="scrollToTopBtn" onclick="document.getElementById('translationList').scrollTop=0" style="display:none; position:absolute; bottom:12px; right:12px; background:var(--accent); color:#fff; border:none; border-radius:50%; width:36px; height:36px; font-size:16px; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,0.3); z-index:10;" title="最新へ">↑</button>
   </div>
 </div>
 
@@ -582,7 +585,7 @@
     <div class="settings-title">翻訳エンジン設定</div>
 
     <div class="form-row">
-      <label for="apiKey">DeepL APIキー（Free）</label>
+      <label for="apiKey">DeepL APIキー（Free / Pro 自動判定）</label>
       <input
         type="password"
         id="apiKey"
@@ -591,6 +594,7 @@
       />
       <span style="font-size:11px; color:var(--text-dim)">
         APIキーは <a href="https://www.deepl.com/account/summary" target="_blank" style="color:var(--accent)">DeepLダッシュボード</a> で取得してください。
+        Freeキーは末尾が <code>:fx</code> で終わります。Proキーにはサフィックスがありません。エンドポイントはキーの種別から自動判定されます。
         ※ コメントテキストがDeepLサーバーに送信されます（無料版はDeepLのサービス改善に使用される場合があります）
       </span>
     </div>
@@ -604,10 +608,11 @@
     </div>
 
     <div class="form-row" id="ollamaModelRow" style="display:none">
-      <label for="ollamaModel">Ollamaモデル名</label>
-      <input type="text" id="ollamaModel" placeholder="translategemma:4b" autocomplete="off" />
+      <label for="ollamaModel">Ollamaモデル</label>
+      <select id="ollamaModel" style="display:none"></select>
+      <input type="text" id="ollamaModelText" placeholder="translategemma:4b" autocomplete="off" />
       <span style="font-size:11px; color:var(--text-dim)">
-        モデルの識別子を入力してください（例: translategemma:4b, qwen3.5:9b）。
+        接続テスト成功後、利用可能なモデルがプルダウンで選択できます。
         詳細は「Ollamaガイド」タブを参照してください。
       </span>
     </div>
@@ -617,6 +622,11 @@
       <select id="targetLang">
         <option value="JA">日本語</option>
         <option value="EN-US">English (US)</option>
+        <option value="ZH">中文（中国語）</option>
+        <option value="KO">한국어（韓国語）</option>
+        <option value="ES">Español（スペイン語）</option>
+        <option value="FR">Français（フランス語）</option>
+        <option value="DE">Deutsch（ドイツ語）</option>
       </select>
     </div>
 
@@ -749,7 +759,7 @@ OLLAMA_KV_CACHE_TYPE=q8_0</div>
         <li>使用するモデルのライセンス遵守はユーザーの責任です。商用配信（収益化配信等）では特に確認してください。</li>
         <li>Gemma Terms of Use（TranslateGemma / Gemma 3）は商用利用に条件があります。詳細は各モデルの公式ページを確認してください。</li>
         <li>本プラグインの使用にあたっては、わんコメおよび各配信プラットフォームの利用規約に従ってください。</li>
-        <li>詳細は <a href="https://github.com/qua121/onecomme-comment-translator#免責事項" target="_blank" style="color:var(--accent)">README の免責事項</a> を参照してください。</li>
+        <li>詳細は <a href="https://github.com/qua121/onecomment_translator#免責事項" target="_blank" style="color:var(--accent)">README の免責事項</a> を参照してください。</li>
       </ul>
     </div>
 
@@ -788,14 +798,17 @@ OLLAMA_KV_CACHE_TYPE=q8_0</div>
 
   function renderTranslations(list) {
     const el = document.getElementById('translationList')
+    const scrollBtn = document.getElementById('scrollToTopBtn')
     if (!list || list.length === 0) {
       el.innerHTML = `
         <div class="empty-state">
           <div class="icon">🌐</div>
           <p>日本語以外のコメントが来ると翻訳が表示されます</p>
         </div>`
+      if (scrollBtn) scrollBtn.style.display = 'none'
       return
     }
+    const wasAtTop = el.scrollTop <= 2
     el.innerHTML = list.map(item => `
       <div class="translation-card">
         <div class="card-header">
@@ -809,7 +822,20 @@ OLLAMA_KV_CACHE_TYPE=q8_0</div>
         </div>
       </div>`
     ).join('')
+    if (wasAtTop) el.scrollTop = 0
+    if (scrollBtn) scrollBtn.style.display = el.scrollTop > 2 ? 'block' : 'none'
   }
+
+  // スクロール時に「最新へ」ボタンの表示切り替え
+  document.addEventListener('DOMContentLoaded', () => {
+    const el = document.getElementById('translationList')
+    const scrollBtn = document.getElementById('scrollToTopBtn')
+    if (el && scrollBtn) {
+      el.addEventListener('scroll', () => {
+        scrollBtn.style.display = el.scrollTop > 2 ? 'block' : 'none'
+      })
+    }
+  })
 
   function renderErrors(list) {
     const el = document.getElementById('errorList')
@@ -871,24 +897,56 @@ OLLAMA_KV_CACHE_TYPE=q8_0</div>
     result.style.color = 'var(--text-dim)'
 
     try {
-      const res = await fetch('http://localhost:11434/api/tags', {
-        signal: AbortSignal.timeout(5000),
+      const res = await fetch(`${API_BASE}?type=ollama_test`, {
+        signal: AbortSignal.timeout(10000),
       })
-      if (res.ok) {
-        const json = await res.json()
-        const models = json.models?.map(m => m.name).join(', ') || 'なし'
+      const json = await res.json()
+      const data = json.response || json
+      if (data.ok) {
+        const modelNames = data.models?.map(m => m.name) || []
+        const models = modelNames.join(', ') || 'なし'
         result.textContent = `✅ 起動中 | 利用可能なモデル: ${models}`
         result.style.color = 'var(--ok)'
+        populateOllamaModelSelect(modelNames)
       } else {
-        result.textContent = `⚠ 応答エラー (HTTP ${res.status})`
-        result.style.color = 'var(--warn)'
+        result.textContent = `❌ ${data.error || '接続失敗'} — Step 2 を確認してください`
+        result.style.color = 'var(--error)'
       }
     } catch (e) {
-      result.textContent = '❌ 未起動 または接続できません — Step 2 を確認してください'
+      result.textContent = '❌ プラグインAPIに接続できません — わんコメが起動しているか確認してください'
       result.style.color = 'var(--error)'
     } finally {
       btn.disabled = false
     }
+  }
+
+  function populateOllamaModelSelect(modelNames) {
+    const select = document.getElementById('ollamaModel')
+    const textInput = document.getElementById('ollamaModelText')
+    if (modelNames.length === 0) {
+      select.style.display = 'none'
+      textInput.style.display = ''
+      return
+    }
+    const currentVal = textInput.value.trim() || select.value || 'translategemma:4b'
+    select.innerHTML = modelNames.map(name =>
+      `<option value="${name}" ${name === currentVal ? 'selected' : ''}>${name}</option>`
+    ).join('')
+    if (!modelNames.includes(currentVal) && currentVal) {
+      select.insertAdjacentHTML('afterbegin',
+        `<option value="${currentVal}" selected>${currentVal}（未検出）</option>`)
+    }
+    select.style.display = ''
+    textInput.style.display = 'none'
+  }
+
+  function getOllamaModelValue() {
+    const select = document.getElementById('ollamaModel')
+    const textInput = document.getElementById('ollamaModelText')
+    if (select.style.display !== 'none' && select.options.length > 0) {
+      return select.value
+    }
+    return textInput.value.trim() || 'translategemma:4b'
   }
 
   async function loadSettings() {
@@ -899,7 +957,7 @@ OLLAMA_KV_CACHE_TYPE=q8_0</div>
       document.getElementById('apiKey').value       = s.apiKeySet ? '（設定済み）' : ''
       document.getElementById('engineSelect').value  = s.engine || 'deepl'
       document.getElementById('targetLang').value    = s.targetLang || 'JA'
-      document.getElementById('ollamaModel').value   = s.ollamaModel || 'translategemma:4b'
+      document.getElementById('ollamaModelText').value = s.ollamaModel || 'translategemma:4b'
       onEngineChange(s.engine || 'deepl')
     } catch (e) {
       console.warn('loadSettings error:', e)
@@ -920,7 +978,7 @@ OLLAMA_KV_CACHE_TYPE=q8_0</div>
     const body = {
       engine:      document.getElementById('engineSelect').value,
       targetLang:  document.getElementById('targetLang').value,
-      ollamaModel: document.getElementById('ollamaModel').value.trim() || 'translategemma:4b',
+      ollamaModel: getOllamaModelValue(),
     }
 
     if (apiKeyVal && apiKeyVal !== '（設定済み）') {
