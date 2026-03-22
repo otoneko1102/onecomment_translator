@@ -15,7 +15,8 @@ const MAX_ERRORS = 20
 const MAX_DEBUG = 100
 const QUEUE_CONCURRENCY = 2
 const REQUEST_TIMEOUT_MS = 30000
-const OLLAMA_TIMEOUT_MS  = 60000  // ローカルLLMは初回モデルロード時に時間がかかる
+const OLLAMA_TIMEOUT_MS       = 300000   // 通常翻訳: 5分
+const OLLAMA_FIRST_TIMEOUT_MS = 3600000  // 初回モデルロード: 1時間
 
 const LANG_NAME_FOR_PROMPT = {
   'JA':    'Japanese',
@@ -189,7 +190,7 @@ function cleanLLMOutput(text) {
   return cleaned || text.trim()
 }
 
-function callOllamaAPI(text, model, targetLang, sourceLang = 'OTHER') {
+function callOllamaAPI(text, model, targetLang, sourceLang = 'OTHER', timeoutMs = OLLAMA_TIMEOUT_MS) {
   const targetName = LANG_NAME_FOR_PROMPT[targetLang] || targetLang
   const targetCode = targetLang.split('-')[0] // 'EN-US' → 'EN'
 
@@ -249,7 +250,7 @@ function callOllamaAPI(text, model, targetLang, sourceLang = 'OTHER') {
 
     req.on('error', (e) => reject({ code: 'OLLAMA_CONNECT_ERROR', message: e.message }))
 
-    req.setTimeout(OLLAMA_TIMEOUT_MS, () => {
+    req.setTimeout(timeoutMs, () => {
       req.destroy()
       reject({ code: 'TIMEOUT', message: 'Request timed out' })
     })
@@ -347,6 +348,7 @@ const plugin = {
   _queue: null,
   _translationCache: null,
   _destroyed: false,
+  _ollamaFirstRequest: true,
   _commentStructureLogged: false,
   _stateVersion: 0,
 
@@ -355,6 +357,7 @@ const plugin = {
     this._queue = new AsyncQueue(QUEUE_CONCURRENCY)
     this._translationCache = new LRUCache(CACHE_MAX_SIZE)
     this._destroyed = false
+    this._ollamaFirstRequest = true
     this._log('INFO', `plugin initialized (v${this.version})`)
     this._log('INFO', `plugin dir: ${dir}`)
     this._log('INFO', `engine: ${store.get('engine')} / targetLang: ${store.get('targetLang')}`)
@@ -449,10 +452,16 @@ const plugin = {
       let translated
       if (engine === 'ollama') {
         const model = store.get('ollamaModel') || 'translategemma:4b'
-        this._log('INFO', `ollama (${model}): "${text.slice(0, 20)}"`)
+        const timeout = this._ollamaFirstRequest ? OLLAMA_FIRST_TIMEOUT_MS : OLLAMA_TIMEOUT_MS
+        if (this._ollamaFirstRequest) {
+          this._log('INFO', `ollama first request (${model}), timeout=${timeout / 1000}s: "${text.slice(0, 20)}"`)
+        } else {
+          this._log('INFO', `ollama (${model}): "${text.slice(0, 20)}"`)
+        }
         translated = await this._queue.add(() =>
-          callOllamaAPI(text, model, targetLang, lang)
+          callOllamaAPI(text, model, targetLang, lang, timeout)
         )
+        this._ollamaFirstRequest = false
       } else {
         const apiKey = store.get('apiKey')
         translated = await this._queue.add(() =>
