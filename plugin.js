@@ -346,6 +346,7 @@ const plugin = {
 
   _store: null,
   _queue: null,
+  _ollamaQueue: null,
   _translationCache: null,
   _destroyed: false,
   _ollamaFirstRequest: true,
@@ -355,6 +356,7 @@ const plugin = {
   init({ dir, store }, initialData) {
     this._store = store
     this._queue = new AsyncQueue(QUEUE_CONCURRENCY)
+    this._ollamaQueue = new AsyncQueue(1)
     this._translationCache = new LRUCache(CACHE_MAX_SIZE)
     this._destroyed = false
     this._ollamaFirstRequest = true
@@ -371,6 +373,7 @@ const plugin = {
     this._log('INFO', 'plugin destroyed')
     this._destroyed = true
     if (this._queue) this._queue.clear()
+    if (this._ollamaQueue) this._ollamaQueue.clear()
     this._store = null
   },
 
@@ -458,7 +461,7 @@ const plugin = {
         } else {
           this._log('INFO', `ollama (${model}): "${text.slice(0, 20)}"`)
         }
-        translated = await this._queue.add(() =>
+        translated = await this._ollamaQueue.add(() =>
           callOllamaAPI(text, model, targetLang, lang, timeout)
         )
         this._ollamaFirstRequest = false
