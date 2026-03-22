@@ -188,6 +188,8 @@ function cleanLLMOutput(text) {
     .replace(/<\/?(?:think|im_start|im_end|endoftext|pad|s|\/s)\b[^>]*>/gi, '')
     // thinkingブロックの中身ごと除去
     .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    // チャットロールラベル以降を切り捨て（user/assistant/systemの再出現）
+    .replace(/\b(?:user|assistant|system)\s+[\s\S]*$/i, '')
     // ラベルプレフィックス除去
     .replace(/^(?:translation|翻訳|訳|output|result|here is|here's)[^:：]*[:：]\s*/i, '')
     // 引用符除去
