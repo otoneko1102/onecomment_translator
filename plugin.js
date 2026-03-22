@@ -480,6 +480,7 @@ const plugin = {
       this._stateVersion++
 
     } catch (err) {
+      if (err?.code === 'CANCELLED') return
       const code = err?.code ?? 'UNKNOWN'
       const info = categorizeError(code)
       this._pushError(code, `${info.cause} — "${text.slice(0, 20)}" [raw: ${err?.message ?? JSON.stringify(err)}]`)
