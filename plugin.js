@@ -190,6 +190,10 @@ function cleanLLMOutput(text) {
     .replace(/<think>[\s\S]*?<\/think>/gi, '')
     // チャットロールラベル以降を切り捨て（user/assistant/systemの再出現）
     .replace(/\b(?:user|assistant|system)\s+[\s\S]*$/i, '')
+    // 注釈・補足説明を除去（「（注：...）」「(Note: ...)」「※...」等）
+    .replace(/\s*[（(]\s*(?:注|Note|注釈|補足|Note:|注：)[\s\S]*$/i, '')
+    // 「Wait,」「Okay,」「Let me」等の思考フレーズ以降を切り捨て
+    .replace(/\s*(?:Wait,|Okay,|Let me|Actually,|I'll|I think|Looking at|So I)[\s\S]*$/i, '')
     // ラベルプレフィックス除去
     .replace(/^(?:translation|翻訳|訳|output|result|here is|here's)[^:：]*[:：]\s*/i, '')
     // 引用符除去
@@ -203,7 +207,9 @@ function callOllamaAPI(text, model, targetLang, sourceLang = 'OTHER', timeoutMs 
   const targetName = LANG_NAME_FOR_PROMPT[targetLang] || targetLang
   const targetCode = targetLang.split('-')[0] // 'EN-US' → 'EN'
 
-  const isTranslateGemma = model.toLowerCase().startsWith('translategemma') && sourceLang !== 'OTHER'
+  const modelLower = model.toLowerCase()
+  const isTranslateGemma = modelLower.startsWith('translategemma') && sourceLang !== 'OTHER'
+  const isQwen = modelLower.startsWith('qwen')
   let systemPrompt
   if (isTranslateGemma) {
     const src = SOURCE_LANG_FOR_PROMPT[sourceLang]
@@ -212,7 +218,11 @@ function callOllamaAPI(text, model, targetLang, sourceLang = 'OTHER', timeoutMs 
   } else {
     systemPrompt =
       `You are a translator. Translate the user's message to ${targetName}. ` +
-      'Output ONLY the translated text. No explanations, no labels, no quotation marks.'
+      'Output ONLY the translated text. No explanations, no notes, no labels, no quotation marks, no parenthetical comments.'
+  }
+  // Qwen3系のthinking（推論）モードを無効化
+  if (isQwen) {
+    systemPrompt = '/no_think\n' + systemPrompt
   }
 
   const body = JSON.stringify({
