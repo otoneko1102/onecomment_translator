@@ -401,7 +401,7 @@ const plugin = {
     const targetLang = (this._store?.get('targetLang') || 'JA').split('-')[0]
     const lang = detectLang(text)
 
-    if (lang === targetLang || (lang === 'JA' && targetLang === 'JA')) {
+    if (lang === targetLang || (lang === 'OTHER' && targetLang === 'EN')) {
       this._log('DEBUG', `skip (${lang}=target): "${text.slice(0, 40)}"`)
       return comment
     }
@@ -537,7 +537,7 @@ const plugin = {
         }
         if (type === 'ollama_test') {
           return new Promise((resolve) => {
-            const req = http.get(
+            const ollamaReq = http.get(
               { hostname: OLLAMA_HOST, port: OLLAMA_PORT, path: '/api/tags', timeout: 5000 },
               (res) => {
                 let data = ''
@@ -556,11 +556,11 @@ const plugin = {
                 })
               }
             )
-            req.on('error', (e) => {
+            ollamaReq.on('error', (e) => {
               resolve({ code: 200, response: { ok: false, error: `接続失敗: ${e.message}` } })
             })
-            req.on('timeout', () => {
-              req.destroy()
+            ollamaReq.on('timeout', () => {
+              ollamaReq.destroy()
               resolve({ code: 200, response: { ok: false, error: 'タイムアウト' } })
             })
           })
