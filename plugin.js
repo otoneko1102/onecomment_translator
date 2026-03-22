@@ -36,20 +36,22 @@ const SOURCE_LANG_FOR_PROMPT = {
   'OTHER': { name: 'English',  code: 'EN' }, // OTHERは英語として扱う（最頻ケース）
 }
 
-const LANG_PATTERNS = {
-  JA: /[\u3040-\u309F\u30A0-\u30FF]/,
-  KO: /[\uAC00-\uD7AF\u1100-\u11FF\u3130-\u318F]/,
-  ZH: /[\u4E00-\u9FFF\u3400-\u4DBF\u{20000}-\u{2A6DF}]/u,
-}
-
-function isJapanese(text) {
-  return LANG_PATTERNS.JA.test(text)
-}
+const SCRIPT_MIN_COUNT = 2
+const SCRIPT_RATIO_THRESHOLD = 0.25
 
 function detectLang(text) {
-  if (LANG_PATTERNS.JA.test(text)) return 'JA'
-  if (LANG_PATTERNS.KO.test(text)) return 'KO'
-  if (LANG_PATTERNS.ZH.test(text)) return 'ZH'
+  const letters = (text.match(/\p{L}/gu) || []).length
+  if (letters === 0) return 'OTHER'
+
+  const ja = (text.match(/[\u3040-\u309F\u30A0-\u30FF]/g) || []).length
+  if (ja >= SCRIPT_MIN_COUNT && ja / letters >= SCRIPT_RATIO_THRESHOLD) return 'JA'
+
+  const ko = (text.match(/[\uAC00-\uD7AF\u1100-\u11FF\u3130-\u318F]/g) || []).length
+  if (ko >= SCRIPT_MIN_COUNT && ko / letters >= SCRIPT_RATIO_THRESHOLD) return 'KO'
+
+  const zh = (text.match(/[\u4E00-\u9FFF\u3400-\u4DBF\u{20000}-\u{2A6DF}]/gu) || []).length
+  if (zh >= SCRIPT_MIN_COUNT && zh / letters >= SCRIPT_RATIO_THRESHOLD) return 'ZH'
+
   return 'OTHER'
 }
 
