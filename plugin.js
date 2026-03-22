@@ -36,8 +36,8 @@ const SOURCE_LANG_FOR_PROMPT = {
   'OTHER': { name: 'English',  code: 'EN' }, // OTHERは英語として扱う（最頻ケース）
 }
 
-const SCRIPT_MIN_COUNT = 2
-const SCRIPT_RATIO_THRESHOLD = 0.25
+const SCRIPT_MIN_COUNT = 2 // 最小文字数
+const SCRIPT_RATIO_THRESHOLD = 0.25 // 最小割合
 
 function detectLang(text) {
   const letters = (text.match(/\p{L}/gu) || []).length
