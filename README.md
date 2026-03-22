@@ -7,7 +7,7 @@
 - わんコメ v5.2 以上
 - 翻訳エンジン（いずれか）:
   - **DeepL**（推奨）: インターネット接続 + DeepL アカウント（無料）
-  - **Ollama**（α版）: NVIDIA GPU推奨（VRAM 6GB以上）、インターネット不要
+  - **Ollama**: NVIDIA GPU推奨（VRAM 6GB以上）、インターネット不要
 
 ## 導入手順
 
@@ -117,12 +117,12 @@ DeepL Free APIは月50万文字まで無料です。通常の配信コメント�
 
 | モデル | ライセンス | 商用利用 |
 |--------|-----------|---------|
+| Qwen3 / Qwen3.5 | Apache 2.0 | 可 |
 | TranslateGemma | Gemma Terms of Use | 条件付き可（要確認） |
-| Qwen3 / Qwen3.5 / Qwen2.5 | Apache 2.0 | 可 |
 | Gemma 3 | Gemma Terms of Use | 条件付き可（要確認） |
-| Aya Expanse | CC-BY-NC-4.0 | **不可（非商用限定）** |
-| Llama 3.x | Llama Community License | 条件付き可（要確認） |
 | Phi-4 / Phi-4-Mini | MIT | 可 |
+| Llama 3.x | Llama Community License | 条件付き可（要確認） |
+| Aya Expanse | CC-BY-NC-4.0 | **不可（非商用限定）** |
 
 ### 翻訳精度について
 
