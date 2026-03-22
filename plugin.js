@@ -183,7 +183,14 @@ function callDeepLAPI(text, apiKey, targetLang = 'JA') {
 
 function cleanLLMOutput(text) {
   const cleaned = text
+    // LLM制御トークン除去（Qwen, Gemma, Llama等）
+    .replace(/<\|[^|]*\|>/g, '')
+    .replace(/<\/?(?:think|im_start|im_end|endoftext|pad|s|\/s)\b[^>]*>/gi, '')
+    // thinkingブロックの中身ごと除去
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    // ラベルプレフィックス除去
     .replace(/^(?:translation|翻訳|訳|output|result|here is|here's)[^:：]*[:：]\s*/i, '')
+    // 引用符除去
     .replace(/^["'`「」『』]+|["'`「」『』]+$/g, '')
     .trim()
   // 後処理で空になった場合は元テキストを返す（ラベルだけ返す異常応答への対処）
@@ -463,9 +470,20 @@ const plugin = {
         } else {
           this._log('INFO', `ollama (${model}): "${text.slice(0, 20)}"`)
         }
-        translated = await this._ollamaQueue.add(() =>
-          callOllamaAPI(text, model, targetLang, lang, timeout)
-        )
+        try {
+          translated = await this._ollamaQueue.add(() =>
+            callOllamaAPI(text, model, targetLang, lang, timeout)
+          )
+        } catch (retryErr) {
+          if (retryErr?.code === 'OLLAMA_EMPTY') {
+            this._log('INFO', `ollama empty response, retrying: "${text.slice(0, 20)}"`)
+            translated = await this._ollamaQueue.add(() =>
+              callOllamaAPI(text, model, targetLang, lang, timeout)
+            )
+          } else {
+            throw retryErr
+          }
+        }
       } else {
         const apiKey = store.get('apiKey')
         translated = await this._queue.add(() =>
