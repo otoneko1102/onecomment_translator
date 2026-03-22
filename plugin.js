@@ -455,8 +455,10 @@ const plugin = {
       let translated
       if (engine === 'ollama') {
         const model = store.get('ollamaModel') || 'translategemma:4b'
-        const timeout = this._ollamaFirstRequest ? OLLAMA_FIRST_TIMEOUT_MS : OLLAMA_TIMEOUT_MS
-        if (this._ollamaFirstRequest) {
+        const isFirst = this._ollamaFirstRequest
+        this._ollamaFirstRequest = false
+        const timeout = isFirst ? OLLAMA_FIRST_TIMEOUT_MS : OLLAMA_TIMEOUT_MS
+        if (isFirst) {
           this._log('INFO', `ollama first request (${model}), timeout=${timeout / 1000}s: "${text.slice(0, 20)}"`)
         } else {
           this._log('INFO', `ollama (${model}): "${text.slice(0, 20)}"`)
@@ -464,7 +466,6 @@ const plugin = {
         translated = await this._ollamaQueue.add(() =>
           callOllamaAPI(text, model, targetLang, lang, timeout)
         )
-        this._ollamaFirstRequest = false
       } else {
         const apiKey = store.get('apiKey')
         translated = await this._queue.add(() =>
